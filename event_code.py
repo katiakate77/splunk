@@ -25,15 +25,17 @@ def get_auth_url():
     return '{}{}/auth/login/'.format(get_base_url(), app)
 
 
-def get_api_auth_answer(auth_url):
+def get_api_auth_answer(sess, auth_url):
     payload = {
         'username': USERNAME,
         'password': PASSWORD,
         'output_mode': 'json',
     }
     try:
-        response = requests.post(auth_url, data=payload, verify=False)
-        if not response.ok:
+        response = sess.post(auth_url, data=payload)
+        if response.ok:
+            logging.info(f'Получили ответ от API {auth_url}')
+        else:
             logging.error(f'Не удалось получить ответ от API, '
                           f'код ошибки {response.status_code}')
             raise Exception(response.status_code)
@@ -46,6 +48,7 @@ def get_api_auth_answer(auth_url):
 def parse_session_key(response):
     try:
         sess_key = response.get('sessionKey')
+        logging.info(f'Получили `sessionKey`: {sess_key}')
     except KeyError:
         logging.error('Отсутствие `sessionKey` в ответе API')
         raise KeyError('Нет ожидаемого ключа')
@@ -55,10 +58,6 @@ def parse_session_key(response):
     return headers
 
 
-def set_headers(sess, headers):
-    ...
-
-
 def main():
     """Основная логика работы бота."""
     logging.basicConfig(
@@ -66,11 +65,13 @@ def main():
         filename='log.log',
         format='%(asctime)s, %(levelname)s, %(message)s',
     )
-    print(get_base_url())
-    print(get_auth_url())
     auth_url = get_auth_url()
-    response = get_api_auth_answer(auth_url)
-    print(parse_session_key(response))
+    with requests.Session() as session:
+        session.verify = False
+        response = get_api_auth_answer(session, auth_url)
+        headers = parse_session_key(response)
+        session.headers.update(headers)
+        logging.info('Установлены заголовки для всей сессии')
 
 
 if __name__ == '__main__':
