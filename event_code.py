@@ -1,6 +1,7 @@
 import logging
 import os
 import requests
+# import time
 import urllib3
 
 from dotenv import load_dotenv
@@ -51,7 +52,7 @@ def get_api_auth_answer(sess):
 def parse_session_key(response):
     try:
         sess_key = response.get('sessionKey')
-        logging.info(f'Получили `sessionKey`: {sess_key}')
+        logging.info('Получили `sessionKey`')
     except KeyError:
         logging.error('Отсутствие `sessionKey` в ответе API')
         raise KeyError('Нет ожидаемого ключа')
@@ -98,6 +99,10 @@ def parse_sid(resp):
 
 def get_job_status_url(sid):
     return get_search_url() + '{}'.format(sid)
+
+
+def get_result_url(sid):
+    return get_search_url() + '{}/results'.format(sid)
 
 
 def main():
