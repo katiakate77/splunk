@@ -68,49 +68,58 @@ class SplunkAuth(SplunkBase):
         }
         return headers
 
+    # @classmethod
+    # def set_headers(cls):
+    #     session_, resp_ = cls.get_api_auth_answer()
+    #     headers_ = cls.parse_session_key(resp_)
+    #     session_.headers.update(headers_)
+    #     logging.info('Установлены заголовки для всей сессии')
+    #     return session_
+
+
+class SplunkSearch(SplunkAuth):
+    # CURRENT_SESSION = SplunkAuth.set_headers()
     @classmethod
-    def set_headers(cls, auth_sess, headers):
-        auth_sess.headers.update(headers)
+    def set_headers(cls):
+        session_, resp_ = cls.get_api_auth_answer()
+        headers_ = cls.parse_session_key(resp_)
+        session_.headers.update(headers_)
         logging.info('Установлены заголовки для всей сессии')
+        return session_
 
+    @classmethod
+    def get_search_url(cls):
+        app = 'search'
+        return '{}{}/search/jobs/'.format(cls.get_base_url(), app)
 
-# class SplunkSearch(SplunkAuth):
-#     CURRENT_SESSION = SplunkAuth.set_headers()
+    def search_request(self, search_query):
+        payload = {
+            'search': search_query,
+            'output_mode': 'json',
+        }
+        try:
+            response = self.set_headers().post(
+                self.get_search_url(), data=payload
+                )
+            if response.ok:
+                logging.info(f'Получили ответ от API {self.get_search_url()}')
+            else:
+                logging.error(f'Не удалось получить ответ от API, '
+                              f'код ошибки {response.status_code}')
+                raise Exception(response.status_code)
+        except Exception as e:
+            logging.error(f'Недоступность эндпоинта, ошибка: {e}')
+            raise Exception('Недоступность эндпоинта')
+        return response.json()
 
-#     @classmethod
-#     def get_search_url(cls):
-#         app = 'search'
-#         return '{}{}/search/jobs/'.format(cls.get_base_url(), app)
-
-#     def search_request(self, search_query):
-#         payload = {
-#             'search': search_query,
-#             'output_mode': 'json',
-#         }
-#         try:
-#             response = self.CURRENT_SESSION.post(
-#                 self.get_search_url(), data=payload
-#                 )
-#             if response.ok:
-#                 logging.info(f'Получили ответ от API {self.get_search_url()}')
-#             else:
-#                 logging.error(f'Не удалось получить ответ от API, '
-#                               f'код ошибки {response.status_code}')
-#                 raise Exception(response.status_code)
-#         except Exception as e:
-#             logging.error(f'Недоступность эндпоинта, ошибка: {e}')
-#             raise Exception('Недоступность эндпоинта')
-#         return response.json()
-
-
-# def parse_sid(resp):
-#     try:
-#         sid = resp.get('sid')
-#         logging.info(f'Получили `sid`: {sid}')
-#     except KeyError:
-#         logging.error('Отсутствие `sid` в ответе API')
-#         raise KeyError('Нет ожидаемого ключа')
-#     return sid
+    def parse_sid(self, resp):
+        try:
+            sid = resp.get('sid')
+            logging.info(f'Получили `sid`: {sid}')
+        except KeyError:
+            logging.error('Отсутствие `sid` в ответе API')
+            raise KeyError('Нет ожидаемого ключа')
+        return sid
 
 
 # def get_job_status_url(sid):
@@ -127,15 +136,9 @@ def main():
         filename='log.log',
         format='%(asctime)s, %(levelname)s, %(message)s',
     )
-    session_, resp_ = SplunkAuth.get_api_auth_answer()
-    headers_ = SplunkAuth.parse_session_key(resp_)
-    SplunkAuth.set_headers(session_, headers_)
-    # obj_1 = SplunkSearch()
-    # print(obj_1)
-    # print(obj_1.search_request(search_query=SEARCH_QUERY_1))
-    # search_query_resp = search_request(session, SEARCH_QUERY_1)
-    # sid = parse_sid(search_query_resp)
-    # print(get_job_status_url(sid))
+    obj_1 = SplunkSearch()
+    r_1 = obj_1.search_request(search_query=SEARCH_QUERY_1)
+    obj_1.parse_sid(r_1)
 
 
 if __name__ == '__main__':
