@@ -5,6 +5,8 @@ import urllib3
 
 from dotenv import load_dotenv
 
+from settings import SEARCH_QUERY_1
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 load_dotenv()
@@ -25,7 +27,8 @@ def get_auth_url():
     return '{}{}/auth/login/'.format(get_base_url(), app)
 
 
-def get_api_auth_answer(sess, auth_url):
+def get_api_auth_answer(sess):
+    auth_url = get_auth_url()
     payload = {
         'username': USERNAME,
         'password': PASSWORD,
@@ -58,6 +61,45 @@ def parse_session_key(response):
     return headers
 
 
+def get_search_url():
+    app = 'search'
+    return '{}{}/search/jobs/'.format(get_base_url(), app)
+
+
+def search_request(sess, search_query):
+    search_url = get_search_url()
+    payload = {
+        'search': search_query,
+        'output_mode': 'json',
+    }
+    try:
+        response = sess.post(search_url, data=payload)
+        if response.ok:
+            logging.info(f'Получили ответ от API {search_url}')
+        else:
+            logging.error(f'Не удалось получить ответ от API, '
+                          f'код ошибки {response.status_code}')
+            raise Exception(response.status_code)
+    except Exception as e:
+        logging.error(f'Недоступность эндпоинта, ошибка: {e}')
+        raise Exception('Недоступность эндпоинта')
+    return response.json()
+
+
+def parse_sid(resp):
+    try:
+        sid = resp.get('sid')
+        logging.info(f'Получили `sid`: {sid}')
+    except KeyError:
+        logging.error('Отсутствие `sid` в ответе API')
+        raise KeyError('Нет ожидаемого ключа')
+    return sid
+
+
+def get_job_status_url(sid):
+    return get_search_url() + '{}'.format(sid)
+
+
 def main():
     """Основная логика работы бота."""
     logging.basicConfig(
@@ -65,13 +107,15 @@ def main():
         filename='log.log',
         format='%(asctime)s, %(levelname)s, %(message)s',
     )
-    auth_url = get_auth_url()
     with requests.Session() as session:
         session.verify = False
-        response = get_api_auth_answer(session, auth_url)
+        response = get_api_auth_answer(session)
         headers = parse_session_key(response)
         session.headers.update(headers)
         logging.info('Установлены заголовки для всей сессии')
+        search_query_resp = search_request(session, SEARCH_QUERY_1)
+        sid = parse_sid(search_query_resp)
+        print(get_job_status_url(sid))
 
 
 if __name__ == '__main__':
