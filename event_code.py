@@ -1,7 +1,7 @@
 import logging
 import os
 import requests
-# import time
+import time
 import urllib3
 
 from dotenv import load_dotenv
@@ -126,29 +126,54 @@ class SplunkSearch(SplunkAuth):
     def get_job_status_url(cls, sid):
         return cls.get_search_url() + '{}'.format(sid)
 
-    def get_job_status(self, sid_):
+    def get_job_response(self, sid):
+        job_status_url = self.get_job_status_url(sid)
         payload = {
             'output_mode': 'json',
         }
-        job_status_query = self.CURRENT_SESSION.get(
-            self.get_job_status_url(sid_), data=payload
-            )
-        return job_status_query
+        try:
+            response = self.CURRENT_SESSION.get(
+                job_status_url, data=payload
+                )
+            if response.ok:
+                logging.info(f'Получили ответ от API {job_status_url}')
+            else:
+                logging.error(f'Не удалось получить ответ от API, '
+                              f'код ошибки {response.status_code}')
+                raise Exception(response.status_code)
+        except Exception as e:
+            logging.error(f'Недоступность эндпоинта, ошибка: {e}')
+            raise Exception('Недоступность эндпоинта')
+        return response.json()
 
-#     def is_done(self):
-#         pass
+    def parse_job_status(self, job_resp):
+        try:
+            is_done_check = job_resp['entry'][0]['content']['isDone']
+            logging.info(f'Получили `isDone`: {is_done_check}')
+        except KeyError:
+            logging.error('Отсутствие `isDone` в ответе API')
+            raise KeyError('Нет ожидаемого ключа')
+        return is_done_check
 
-#     @classmethod
-#     def get_result_url(cls, sid):
-#         return cls.get_search_url() + '{}/results'.format(sid)
+    def is_done(self, sid):
+        done_check = False
+        while not done_check:
+            time.sleep(2)
+            resp_ = self.get_job_response(sid)
+            done_check = self.parse_job_status(resp_)
+        return True
+
+    @classmethod
+    def get_result_url(cls, sid):
+        return cls.get_search_url() + '{}/results'.format(sid)
 
 
 def main():
     job_1 = SplunkSearch()
     resp_1 = job_1.search_request(search_query=SEARCH_QUERY_1)
     sid_1 = job_1.parse_sid(resp_1)
-    status_1 = job_1.get_job_status(sid_1)
-    print(status_1)
+    resp_2 = job_1.is_done(sid_1)
+    print(resp_2)
 
 
 if __name__ == '__main__':
