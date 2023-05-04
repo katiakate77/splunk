@@ -167,13 +167,33 @@ class SplunkSearch(SplunkAuth):
     def get_result_url(cls, sid):
         return cls.get_search_url() + '{}/results'.format(sid)
 
+    def get_results(self, sid):
+        result_url = self.get_result_url(sid)
+        payload = {
+            'output_mode': 'json',
+        }
+        try:
+            response = self.CURRENT_SESSION.get(
+                result_url, data=payload
+                )
+            if response.ok:
+                logging.info(f'Получили ответ от API {result_url}')
+            else:
+                logging.error(f'Не удалось получить ответ от API, '
+                              f'код ошибки {response.status_code}')
+                raise Exception(response.status_code)
+        except Exception as e:
+            logging.error(f'Недоступность эндпоинта, ошибка: {e}')
+            raise Exception('Недоступность эндпоинта')
+        return response.json()['results']
+
 
 def main():
     job_1 = SplunkSearch()
     resp_1 = job_1.search_request(search_query=SEARCH_QUERY_1)
     sid_1 = job_1.parse_sid(resp_1)
-    resp_2 = job_1.is_done(sid_1)
-    print(resp_2)
+    job_1.is_done(sid_1)
+    print(job_1.get_results(sid_1))
 
 
 if __name__ == '__main__':
