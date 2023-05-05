@@ -191,6 +191,9 @@ class SplunkSearch(SplunkAuth):
             if event_count >= max_event_count:
                 self.finalize_job(sid)
                 logging.info('Останавливаем парсинг')
+                logging.warning(
+                    f'Найдено больше, чем {max_event_count} событий'
+                    )
             time.sleep(2)
             resp_ = self.get_job_response(sid)
             done_check, event_count = self.parse_job_status(resp_)
