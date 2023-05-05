@@ -182,9 +182,7 @@ class SplunkSearch(SplunkAuth):
             logging.error(f'Недоступность эндпоинта, ошибка: {e}')
             raise Exception('Недоступность эндпоинта')
 
-    def is_done(self, sid, max_event_count=None):
-        if max_event_count is None:
-            max_event_count = MAX_EVENT_COUNT
+    def is_done(self, sid, max_event_count=MAX_EVENT_COUNT):
         done_check = False
         event_count = 0
         while not done_check:
