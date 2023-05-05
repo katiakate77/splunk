@@ -6,7 +6,7 @@ import urllib3
 
 from dotenv import load_dotenv
 
-from settings import SEARCH_QUERY_1
+from settings import SEARCH_QUERY_2
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -149,18 +149,51 @@ class SplunkSearch(SplunkAuth):
     def parse_job_status(self, job_resp):
         try:
             is_done_check = job_resp['entry'][0]['content']['isDone']
-            logging.info(f'Получили `isDone`: {is_done_check}')
+            event_counter = job_resp['entry'][0]['content']['eventCount']
+            logging.info(
+                f'Получили `isDone`: {is_done_check}, '
+                f'`eventCount`: {event_counter}'
+                )
         except KeyError:
-            logging.error('Отсутствие `isDone` в ответе API')
+            logging.error('Отсутствие `isDone` или `eventCount` в ответе API')
             raise KeyError('Нет ожидаемого ключа')
-        return is_done_check
+        return is_done_check, event_counter
 
-    def is_done(self, sid):
+    @classmethod
+    def get_control_url(cls, sid):
+        return cls.get_search_url() + '{}/control'.format(sid)
+
+    def finalize_job(self, sid):
+        job_control_url = self.get_control_url(sid)
+        payload = {
+            'action': 'finalize',
+        }
+        try:
+            response = self.CURRENT_SESSION.post(
+                job_control_url, data=payload
+                )
+            if response.ok:
+                logging.info(f'Получили ответ от API {job_control_url}')
+            else:
+                logging.error(f'Не удалось получить ответ от API, '
+                              f'код ошибки {response.status_code}')
+                raise Exception(response.status_code)
+        except Exception as e:
+            logging.error(f'Недоступность эндпоинта, ошибка: {e}')
+            raise Exception('Недоступность эндпоинта')
+
+    def is_done(self, sid, max_event_count=None):
+        if max_event_count is None:
+            max_event_count = 500_000
         done_check = False
+        event_count = 0
         while not done_check:
+            if event_count >= max_event_count:
+                self.finalize_job(sid)
+                logging.info('Останавливаем парсинг')
             time.sleep(2)
             resp_ = self.get_job_response(sid)
-            done_check = self.parse_job_status(resp_)
+            done_check, event_count = self.parse_job_status(resp_)
         return True
 
     @classmethod
@@ -169,7 +202,6 @@ class SplunkSearch(SplunkAuth):
 
     def get_results(self, sid, offset=None, count=None):
         result_url = self.get_result_url(sid)
-        self.is_done(sid)
         if offset is None:
             offset = 0
         if count is None:
@@ -203,10 +235,20 @@ def get_result_filename():
 
 def main():
     job_1 = SplunkSearch()
-    resp_1 = job_1.search_request(search_query=SEARCH_QUERY_1)
+    resp_1 = job_1.search_request(search_query=SEARCH_QUERY_2)
     sid_1 = job_1.parse_sid(resp_1)
-    print(job_1.get_results(sid_1))
-    # print(get_result_filename())
+    job_1.is_done(sid_1)
+    offset_ = 0
+    count_ = 5
+    while True:
+        res = job_1.get_results(sid_1, offset=offset_, count=count_)
+        if res:
+            print(res)
+            logging.info('Печатаем результаты')
+        else:
+            break
+        offset_ += count_
+    print(get_result_filename())
 
 
 if __name__ == '__main__':
