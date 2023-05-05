@@ -167,14 +167,23 @@ class SplunkSearch(SplunkAuth):
     def get_result_url(cls, sid):
         return cls.get_search_url() + '{}/results'.format(sid)
 
-    def get_results(self, sid):
+    def get_results(self, sid, offset=None, count=None):
         result_url = self.get_result_url(sid)
+        self.is_done(sid)
+        if offset is None:
+            offset = 0
+        if count is None:
+            count = 0
+        params = {
+            'offset': offset,
+            'count': count,
+        }
         payload = {
             'output_mode': 'json',
         }
         try:
             response = self.CURRENT_SESSION.get(
-                result_url, data=payload
+                result_url, params=params, data=payload
                 )
             if response.ok:
                 logging.info(f'Получили ответ от API {result_url}')
@@ -188,12 +197,16 @@ class SplunkSearch(SplunkAuth):
         return response.json()['results']
 
 
+def get_result_filename():
+    return f'RESULTS_{time.strftime("%d-%m-%y_%H:%M:%S")}.csv'
+
+
 def main():
     job_1 = SplunkSearch()
     resp_1 = job_1.search_request(search_query=SEARCH_QUERY_1)
     sid_1 = job_1.parse_sid(resp_1)
-    job_1.is_done(sid_1)
     print(job_1.get_results(sid_1))
+    # print(get_result_filename())
 
 
 if __name__ == '__main__':
