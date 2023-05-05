@@ -6,7 +6,7 @@ import urllib3
 
 from dotenv import load_dotenv
 
-from settings import SEARCH_QUERY_2
+from settings import MAX_EVENT_COUNT, SEARCH_QUERY_2
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -184,7 +184,7 @@ class SplunkSearch(SplunkAuth):
 
     def is_done(self, sid, max_event_count=None):
         if max_event_count is None:
-            max_event_count = 500_000
+            max_event_count = MAX_EVENT_COUNT
         done_check = False
         event_count = 0
         while not done_check:
