@@ -249,7 +249,6 @@ def main():
         else:
             break
         offset_ += count_
-    print(get_result_filename())
 
 
 if __name__ == '__main__':
